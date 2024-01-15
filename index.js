@@ -30,13 +30,11 @@ async function run() {
    
     await client.connect();
     const examCollection = client.db("examUserDb").collection("examUsers");
+    const courseCollection = client.db("examUserDb").collection("courseCollection");
 
     app.post('/examInfo',async (req,res)=>{
-        const examInfo=req.body;
-        const start_date=examInfo.date;
-        // const start_date = "2023-08-1";
-        // const start_time = "10";
-        console.log(start_date);
+        const {date,time,level,department}=req.body;
+
     const extra_holiday = [
         {
             id: 1,
@@ -52,48 +50,32 @@ async function run() {
         }
     ];
     
-    const courses = [
-        {
-            id: 1,
-            ece_course_name: "ECE-301",
-            course_credit: 3
-        },
-        {
-            id: 2,
-            ece_course_name: "ECE-302",
-            course_credit: 3
-        },
-        {
-            id: 3,
-            ece_course_name: "ECE-303",
-            course_credit: 3
-        },
-        {
-            id: 4,
-            ece_course_name: "ECE-304",
-            course_credit: 2
-        },
-        {
-            id: 5,
-            ece_course_name: "ECE-305",
-            course_credit: 2
-        }
-    ];
-    const examSchedule=generateExamRoutine(start_date,extra_holiday,courses);
-    console.log(examSchedule);
-    function generateExamRoutine(start_date, extra_holiday, courses) {
+  
+
+    const courseResult = await courseCollection.findOne({ [department]: { $elemMatch: { [level]: { $exists: true } } } });
+    const courses = courseResult[department][0][level];
+    const examSchedule=generateExamRoutine(date,extra_holiday,courses);
+    // console.log(examSchedule);
+    function generateExamRoutine(date, extra_holiday, courses) {
         const examSchedule = [];
     
-        let given_date = start_date;
+        let given_date = date;
     
         for (let i = 0; i < courses.length; i++) {
             let dayOfTheDate = getDayOfTheDate(given_date).toLowerCase();
-    
+            let duration;
             if (dayOfTheDate != 'friday' && dayOfTheDate != 'saturday' && !holiday_check(given_date)) {
+                let duration;
+                if(time==10){
+                    duration = courses[i].credit === 3 ? "10am-1pm" : "10am-12am";
+                }
+                else if(time==2){
+                    duration = courses[i].credit === 3 ? "2pm-5pm" : "2pm-4pm";
+                }
                 examSchedule.push({
                     date: given_date,
                     day: dayOfTheDate,
-                    course_name: courses[i].ece_course_name
+                    course_name: courses[i].name
                 });
             } else if (dayOfTheDate == 'friday' || dayOfTheDate == 'saturday' || holiday_check(given_date)) {
                 // Skip to the next working day
@@ -101,14 +83,21 @@ async function run() {
                     given_date = getNextDate(given_date, 1);
                     dayOfTheDate = getDayOfTheDate(given_date).toLowerCase();
                 }
+                if(time==10){
+                    duration = courses[i].credit === 3 ? "10am-1pm" : "10am-12am";
+                }
+                else if(time==2){
+                    duration = courses[i].credit === 3 ? "2pm-5pm" : "2pm-4pm";
+                }
                 examSchedule.push({
                     date: given_date,
                     day: dayOfTheDate,
-                    course_name: courses[i].ece_course_name
+                    course_name: courses[i].name,
+                    time:duration
                 });
             }
     
-            const gap = courses[i].course_credit === 3 ? 3 : 2;
+            const gap = courses[i].credit === 3 ? 3 : 2;
     
             // Add the specified gap before the next exam
             given_date = getNextDate(given_date, gap);
